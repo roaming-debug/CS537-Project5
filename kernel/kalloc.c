@@ -49,6 +49,11 @@ kfree(char *v)
   kmem.free_pages++;
   struct run *r;
 
+  int i = ((uint)v - (uint)end) / PGSIZE;
+  if (kmem.ref_cnt[i] != 1) {
+    ; // debug here
+  }
+
   if((uint)v % PGSIZE || v < end || (uint)v >= PHYSTOP) 
     panic("kfree");
 
@@ -74,6 +79,8 @@ kalloc(void)
   r = kmem.freelist;
   if(r)
     kmem.freelist = r->next;
+  int i = ((uint)r - (uint)end) / PGSIZE;
+  kmem.ref_cnt[i] = 1;
   release(&kmem.lock);
   return (char*)r;
 }
@@ -82,4 +89,28 @@ kalloc(void)
 int getFreePagesCount(void)
 {
   return kmem.free_pages;
+}
+
+// returns index in ref_cnt array for given page
+int refCountIndex(char* v)
+{
+  return ((uint)v - (uint)end) / PGSIZE;
+}
+
+// increment reference count for the given page
+int incRefCount(char* v)
+{
+  acquire(&kmem.lock);
+  int i = refCountIndex(v);
+  kmem.ref_cnt[i]++;
+  release(&kmem.lock);
+}
+
+// decrement reference count for the given page
+int decRefCount(char *v)
+{
+  acquire(&kmem.lock);
+  int i = refCountIndex(v);
+  kmem.ref_cnt[i]--;
+  release(&kmem.lock);
 }
