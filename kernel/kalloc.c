@@ -97,6 +97,11 @@ int refCountIndex(char* v)
   return ((uint)v - (uint)end) / PGSIZE;
 }
 
+int getRefCount(char* v)
+{
+  return kmem.ref_cnt[refCountIndex(v)];
+}
+
 // increment reference count for the given page
 void incRefCount(char* v)
 {

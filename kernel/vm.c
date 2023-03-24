@@ -405,7 +405,7 @@ void pg_fault_handler() {
     panic("CoW: Invalid virtual address");
   pa = PTE_ADDR(*pte);
   flags = PTE_FLAGS(*pte);
-  if (refCountIndex((char*)pa) == 1) {
+  if (getRefCount((char*)pa) == 1) {
     *pte = *pte | PTE_W;
   }
   else {
@@ -414,9 +414,7 @@ void pg_fault_handler() {
       panic("CoW: allocate new memory failed");
     }
     memmove(mem, (char*)pa, PGSIZE);
-    if(mappages(proc->pgdir, (void*)vp, PGSIZE, PADDR(mem), flags|PTE_W) < 0) {
-      panic("CoW: map pages error");
-    }
+    *pte = (uint)mem | flags | PTE_W | PTE_P;
     decRefCount((char*)pa);
   }
   lcr3(PADDR(proc->pgdir));

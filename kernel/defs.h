@@ -70,6 +70,7 @@ int             getFreePagesCount(void);
 void            incRefCount(char*);
 void            decRefCount(char*);
 int             refCountIndex(char*);
+int             getRefCount(char*);
 
 // kbd.c
 void            kbdintr(void);
