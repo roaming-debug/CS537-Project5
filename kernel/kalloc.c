@@ -98,7 +98,7 @@ int refCountIndex(char* v)
 }
 
 // increment reference count for the given page
-int incRefCount(char* v)
+void incRefCount(char* v)
 {
   acquire(&kmem.lock);
   int i = refCountIndex(v);
@@ -107,7 +107,7 @@ int incRefCount(char* v)
 }
 
 // decrement reference count for the given page
-int decRefCount(char *v)
+void decRefCount(char *v)
 {
   acquire(&kmem.lock);
   int i = refCountIndex(v);

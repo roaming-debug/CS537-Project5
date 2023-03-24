@@ -333,7 +333,6 @@ cowuvm(pde_t *pgdir, uint sz)
   pde_t *d;
   pte_t *pte;
   uint pa, i, flags;
-  char *mem;
 
   if((d = setupkvm()) == 0)
     return 0;
@@ -344,7 +343,7 @@ cowuvm(pde_t *pgdir, uint sz)
       panic("cowyuvm: page not present");
     pa = PTE_ADDR(*pte);
     flags = PTE_FLAGS(*pte) & ~PTE_W;
-    incRefCount(pa);
+    incRefCount((char*)pa);
     if(mappages(d, (void*)i, PGSIZE, pa, flags) < 0)
       goto bad;
   }
@@ -397,8 +396,7 @@ copyout(pde_t *pgdir, uint va, void *p, uint len)
 
 // Page fault handler
 void pg_fault_handler() {
-  char* vp = rcr2();
-  pde_t *d;
+  char* vp = (char*)rcr2();
   pte_t *pte;
   uint pa, flags;
   if((pte = walkpgdir(proc->pgdir, (void*)vp, 0)) == 0)
@@ -407,7 +405,7 @@ void pg_fault_handler() {
     panic("CoW: Invalid virtual address");
   pa = PTE_ADDR(*pte);
   flags = PTE_FLAGS(*pte);
-  if (refCountIndex(pa) == 1) {
+  if (refCountIndex((char*)pa) == 1) {
     *pte = *pte | PTE_W;
   }
   else {
@@ -416,10 +414,10 @@ void pg_fault_handler() {
       panic("CoW: allocate new memory failed");
     }
     memmove(mem, (char*)pa, PGSIZE);
-    if(mappages(d, (void*)vp, PGSIZE, PADDR(mem), flags|PTE_W) < 0) {
+    if(mappages(proc->pgdir, (void*)vp, PGSIZE, PADDR(mem), flags|PTE_W) < 0) {
       panic("CoW: map pages error");
     }
-    decRefCount(pa);
+    decRefCount((char*)pa);
   }
   lcr3(PADDR(proc->pgdir));
 }
