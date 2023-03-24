@@ -75,6 +75,9 @@ trap(struct trapframe *tf)
             cpu->id, tf->cs, tf->eip);
     lapiceoi();
     break;
+  case T_PGFLT:
+    pg_fault_handler();
+    break;
    
   default:
     if(proc == 0 || (tf->cs&3) == 0){
