@@ -40,3 +40,5 @@ user/bin/
 tools/mkfs
 version
 
+
+runtests.log

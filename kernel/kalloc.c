@@ -33,6 +33,7 @@ kinit(void)
   char *p;
 
   initlock(&kmem.lock, "kmem");
+  kmem.free_pages = 0;
   p = (char*)PGROUNDUP((uint)end);
   for(; p + PGSIZE <= (char*)PHYSTOP; p += PGSIZE)
     kfree(p);
@@ -45,6 +46,7 @@ kinit(void)
 void
 kfree(char *v)
 {
+  kmem.free_pages++;
   struct run *r;
 
   if((uint)v % PGSIZE || v < end || (uint)v >= PHYSTOP) 
@@ -67,7 +69,7 @@ char*
 kalloc(void)
 {
   struct run *r;
-
+  kmem.free_pages--;
   acquire(&kmem.lock);
   r = kmem.freelist;
   if(r)
@@ -76,3 +78,8 @@ kalloc(void)
   return (char*)r;
 }
 
+// retrieve the total number of free pages in the system
+int getFreePagesCount(void)
+{
+  return kmem.free_pages;
+}

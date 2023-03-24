@@ -88,3 +88,9 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+// retrieve the total number of free pages in the system
+int sys_getFreePagesCount(void)
+{
+  return getFreePagesCount();
+}
