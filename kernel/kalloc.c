@@ -78,8 +78,6 @@ kalloc(void)
   if(r) {
     kmem.freelist = r->next;
     kmem.ref_cnt[(uint)r / PGSIZE] = 1;
-    //cprintf("index (new): %d\n", (uint)r / PGSIZE);
-    //cprintf("ref_cnt (new): %d\n", kmem.ref_cnt[(uint)r / PGSIZE]);
     kmem.free_pages--;
   }
   release(&kmem.lock);
@@ -95,7 +93,6 @@ int getFreePagesCount(void)
 // returns index in ref_cnt array for the given page
 int refCountIndex(char* v)
 {
-  //cprintf("index (old): %d\n", (uint)v / PGSIZE);
   return (uint)v / PGSIZE;
 }
 
@@ -110,7 +107,6 @@ void incRefCount(char* v)
 {
   acquire(&kmem.lock);
   kmem.ref_cnt[refCountIndex(v)]++;
-  //cprintf("ref_cnt (old): %d\n", kmem.ref_cnt[(uint)v / PGSIZE]);
   release(&kmem.lock);
 }
 
@@ -119,6 +115,5 @@ void decRefCount(char *v)
 {
   acquire(&kmem.lock);
   kmem.ref_cnt[refCountIndex(v)]--;
-  //cprintf("ref_cnt (old): %d\n", kmem.ref_cnt[(uint)v / PGSIZE]);
   release(&kmem.lock);
 }
