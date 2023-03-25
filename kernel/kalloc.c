@@ -35,8 +35,10 @@ kinit(void)
   initlock(&kmem.lock, "kmem");
   kmem.free_pages = 0;
   p = (char*)PGROUNDUP((uint)end);
-  for(; p + PGSIZE <= (char*)PHYSTOP; p += PGSIZE)
+  for(; p + PGSIZE <= (char*)PHYSTOP; p += PGSIZE) {
+    kmem.ref_cnt[refCountIndex(p)] = 0;
     kfree(p);
+  }
 }
 
 // Free the page of physical memory pointed at by v,
@@ -46,24 +48,21 @@ kinit(void)
 void
 kfree(char *v)
 {
-  kmem.free_pages++;
   struct run *r;
-
-  int i = ((uint)v - (uint)end) / PGSIZE;
-  if (kmem.ref_cnt[i] != 1) {
-    ; // debug here
-  }
 
   if((uint)v % PGSIZE || v < end || (uint)v >= PHYSTOP) 
     panic("kfree");
 
-  // Fill with junk to catch dangling refs.
-  memset(v, 1, PGSIZE);
-
   acquire(&kmem.lock);
   r = (struct run*)v;
-  r->next = kmem.freelist;
-  kmem.freelist = r;
+  if (kmem.ref_cnt[refCountIndex(v)] > 0)
+    kmem.ref_cnt[refCountIndex(v)]--;
+  if (kmem.ref_cnt[refCountIndex(v)] == 0) {
+    memset(v, 1, PGSIZE); // Fill with junk to catch dangling refs.
+    r->next = kmem.freelist;
+    kmem.freelist = r;
+    kmem.free_pages++;
+  }
   release(&kmem.lock);
 }
 
@@ -74,13 +73,15 @@ char*
 kalloc(void)
 {
   struct run *r;
-  kmem.free_pages--;
   acquire(&kmem.lock);
   r = kmem.freelist;
-  if(r)
+  if(r) {
     kmem.freelist = r->next;
-  int i = ((uint)r - (uint)end) / PGSIZE;
-  kmem.ref_cnt[i] = 1;
+    kmem.ref_cnt[(uint)r / PGSIZE] = 1;
+    //cprintf("index (new): %d\n", (uint)r / PGSIZE);
+    //cprintf("ref_cnt (new): %d\n", kmem.ref_cnt[(uint)r / PGSIZE]);
+    kmem.free_pages--;
+  }
   release(&kmem.lock);
   return (char*)r;
 }
@@ -91,12 +92,14 @@ int getFreePagesCount(void)
   return kmem.free_pages;
 }
 
-// returns index in ref_cnt array for given page
+// returns index in ref_cnt array for the given page
 int refCountIndex(char* v)
 {
-  return ((uint)v - (uint)end) / PGSIZE;
+  //cprintf("index (old): %d\n", (uint)v / PGSIZE);
+  return (uint)v / PGSIZE;
 }
 
+// return number of references for the given page
 int getRefCount(char* v)
 {
   return kmem.ref_cnt[refCountIndex(v)];
@@ -106,8 +109,8 @@ int getRefCount(char* v)
 void incRefCount(char* v)
 {
   acquire(&kmem.lock);
-  int i = refCountIndex(v);
-  kmem.ref_cnt[i]++;
+  kmem.ref_cnt[refCountIndex(v)]++;
+  //cprintf("ref_cnt (old): %d\n", kmem.ref_cnt[(uint)v / PGSIZE]);
   release(&kmem.lock);
 }
 
@@ -115,7 +118,7 @@ void incRefCount(char* v)
 void decRefCount(char *v)
 {
   acquire(&kmem.lock);
-  int i = refCountIndex(v);
-  kmem.ref_cnt[i]--;
+  kmem.ref_cnt[refCountIndex(v)]--;
+  //cprintf("ref_cnt (old): %d\n", kmem.ref_cnt[(uint)v / PGSIZE]);
   release(&kmem.lock);
 }

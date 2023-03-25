@@ -326,7 +326,7 @@ bad:
   return 0;
 }
 
-// Given a parent process's page table, mapping partent' pages to child's pages
+// Given a parent process's page table, mapping parent's pages to child's pages
 pde_t*
 cowuvm(pde_t *pgdir, uint sz)
 {
@@ -341,19 +341,20 @@ cowuvm(pde_t *pgdir, uint sz)
       panic("cowyuvm: pte should exist");
     if(!(*pte & PTE_P))
       panic("cowyuvm: page not present");
+    *pte = *pte & ~PTE_W;
+    flags = PTE_FLAGS(*pte);
     pa = PTE_ADDR(*pte);
-    flags = PTE_FLAGS(*pte) & ~PTE_W;
     incRefCount((char*)pa);
-    if(mappages(d, (void*)i, PGSIZE, pa, flags) < 0)
-      goto bad;
+    if(mappages(d, (void*)i, PGSIZE, pa, flags) < 0) {
+      freevm(d);
+      lcr3(PADDR(pgdir));
+      return 0;
+    }
   }
   lcr3(PADDR(pgdir));
   return d;
-
-bad:
-  freevm(d);
-  return 0;
 }
+
 // Map user virtual address to kernel physical address.
 char*
 uva2ka(pde_t *pgdir, char *uva)
@@ -396,22 +397,23 @@ copyout(pde_t *pgdir, uint va, void *p, uint len)
 
 // Page fault handler
 void pg_fault_handler() {
-  char* vp = (char*)rcr2();
+  uint va = rcr2();
   pte_t *pte;
   uint pa, flags;
-  if((pte = walkpgdir(proc->pgdir, (void*)vp, 0)) == 0)
-    panic("CoW: pte should exist");
-  if(!(*pte & PTE_P))
-    panic("CoW: Invalid virtual address");
+  if((pte = walkpgdir(proc->pgdir, (void*)va, 0)) == 0 || !(*pte & PTE_P)) {
+    cprintf("CoW: Invalid virtual address");
+    proc->killed = 1;
+    return;
+  }
   pa = PTE_ADDR(*pte);
   flags = PTE_FLAGS(*pte);
   if (getRefCount((char*)pa) == 1) {
     *pte = *pte | PTE_W;
   }
-  else {
+  else { // >1 ref
     char* mem;
     if((mem = kalloc()) == 0) {
-      panic("CoW: allocate new memory failed");
+      panic("CoW: allocate new memory in page fault handler failed");
     }
     memmove(mem, (char*)pa, PGSIZE);
     *pte = (uint)mem | flags | PTE_W | PTE_P;
